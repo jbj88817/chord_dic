@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Music Chord Dictionary</string>
+    <string name="enter_notes">Enter notes (C, D, E or 1, 2, 3)</string>
+    <string name="select_key">Select Key</string>
+    <string name="identify_chord">Identify Chord</string>
+    <string name="clear">Clear</string>
+    <string name="chord_result">Chord: %1$s</string>
+    <string name="notes_hint">Example: C E G or 1 3 5</string>
+    <string name="use_numeric">Use numeric notation</string>
+    <string name="use_letter">Use letter notation</string>
+</resources> 

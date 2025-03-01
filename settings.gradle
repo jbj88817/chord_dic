@@ -1,0 +1,10 @@
+include ':app'
+rootProject.name = "Music Chord Dictionary"
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+} 
