@@ -45,9 +45,10 @@ class ChordIdentifier {
          * Identifies a chord from a set of notes in letter notation (e.g., "C", "Eb", "G")
          * @param notes List of notes in letter notation
          * @param key Optional key for context, may help resolve ambiguities
+         * @param identifyInversions Whether to identify chord inversions
          * @return The identified chord name or "Unknown chord" if not recognized
          */
-        fun identifyChord(notes: List<String>, key: String? = null): String {
+        fun identifyChord(notes: List<String>, key: String? = null, identifyInversions: Boolean = true): String {
             if (notes.isEmpty()) return "No notes provided"
             if (notes.size == 1) return "${notes[0]} note"
             
@@ -61,6 +62,10 @@ class ChordIdentifier {
                 return "Invalid note(s) found"
             }
             
+            // Assume the first note is the bass note (lowest note)
+            val bassNote = normalizedNotes.first()
+            val bassNoteIndex = NOTES.indexOf(bassNote)
+            
             // Try each note as the potential root
             for (potentialRoot in noteIndices.distinct()) {
                 // Calculate intervals from this root
@@ -70,22 +75,92 @@ class ChordIdentifier {
                 for ((chordType, chordIntervals) in CHORD_TYPES) {
                     if (intervals == chordIntervals) {
                         val rootNoteName = NOTES[potentialRoot]
+                        
+                        // If we want to identify inversions and the bass note is not the root
+                        if (identifyInversions && potentialRoot != bassNoteIndex) {
+                            // This is an inverted chord - use slash notation
+                            return "$rootNoteName $chordType/$bassNote"
+                        }
+                        
                         return "$rootNoteName $chordType"
                     }
                 }
             }
             
             // If we haven't returned by now, try to identify incomplete chords
-            return identifyIncompleteChord(noteIndices) ?: "Unknown chord"
+            return identifyIncompleteChord(noteIndices, normalizedNotes.first(), identifyInversions) ?: "Unknown chord"
+        }
+        
+        /**
+         * Identifies a chord from a set of notes, with specific information about inversions
+         * @param notes List of notes in letter notation
+         * @param key Optional key for context
+         * @return The identified chord name with inversion information
+         */
+        fun identifyChordWithInversion(notes: List<String>, key: String? = null): String {
+            if (notes.isEmpty()) return "No notes provided"
+            if (notes.size == 1) return "${notes[0]} note"
+            
+            // Normalize notes (convert flats to sharps for internal processing)
+            val normalizedNotes = notes.map { normalizeNote(it) }
+            
+            // Convert notes to numeric indices (0-11)
+            val noteIndices = normalizedNotes.mapNotNull { NOTES.indexOf(it) }.filter { it >= 0 }
+            
+            if (noteIndices.size < notes.size) {
+                return "Invalid note(s) found"
+            }
+            
+            // Assume the first note is the bass note (lowest note)
+            val bassNote = normalizedNotes.first()
+            val bassNoteIndex = NOTES.indexOf(bassNote)
+            
+            // Try each note as the potential root
+            for (potentialRoot in noteIndices.distinct()) {
+                // Calculate intervals from this root
+                val intervals = calculateIntervals(noteIndices, potentialRoot)
+                
+                // Check if these intervals match any known chord type
+                for ((chordType, chordIntervals) in CHORD_TYPES) {
+                    if (intervals == chordIntervals) {
+                        val rootNoteName = NOTES[potentialRoot]
+                        
+                        // Identify the inversion based on which chord tone is in the bass
+                        val inversionInfo = when {
+                            potentialRoot == bassNoteIndex -> "Root position"
+                            chordType.contains("Major") && (bassNoteIndex - potentialRoot + 12) % 12 == 4 -> 
+                                "First inversion (bass: 3rd) - $rootNoteName $chordType/$bassNote"
+                            chordType.contains("Minor") && (bassNoteIndex - potentialRoot + 12) % 12 == 3 -> 
+                                "First inversion (bass: 3rd) - $rootNoteName $chordType/$bassNote"
+                            chordType.contains("Major") && (bassNoteIndex - potentialRoot + 12) % 12 == 7 -> 
+                                "Second inversion (bass: 5th) - $rootNoteName $chordType/$bassNote"
+                            chordType.contains("Minor") && (bassNoteIndex - potentialRoot + 12) % 12 == 7 -> 
+                                "Second inversion (bass: 5th) - $rootNoteName $chordType/$bassNote"
+                            chordType.contains("7th") && (bassNoteIndex - potentialRoot + 12) % 12 == 10 -> 
+                                "Third inversion (bass: 7th) - $rootNoteName $chordType/$bassNote"
+                            chordType.contains("Major 7th") && (bassNoteIndex - potentialRoot + 12) % 12 == 11 -> 
+                                "Third inversion (bass: 7th) - $rootNoteName $chordType/$bassNote"
+                            else -> "Inversion with bass note: $bassNote - $rootNoteName $chordType/$bassNote"
+                        }
+                        
+                        return inversionInfo
+                    }
+                }
+            }
+            
+            // If we haven't returned by now, try incomplete chords
+            val incompleteResult = identifyIncompleteChord(noteIndices, bassNote, true)
+            return incompleteResult ?: "Unknown chord"
         }
         
         /**
          * Identifies a chord from a set of numeric notes (scale degrees) relative to a key
          * @param numericNotes List of notes in numeric notation (1-7)
          * @param key The key to interpret the numeric notes in
+         * @param identifyInversions Whether to identify chord inversions
          * @return The identified chord name or "Unknown chord" if not recognized
          */
-        fun identifyChordFromNumeric(numericNotes: List<Int>, key: String): String {
+        fun identifyChordFromNumeric(numericNotes: List<Int>, key: String, identifyInversions: Boolean = true): String {
             if (numericNotes.isEmpty()) return "No notes provided"
             if (numericNotes.size == 1) return "Single note"
             
@@ -101,7 +176,7 @@ class ChordIdentifier {
                 NOTES[majorScale[degree - 1]]
             }
             
-            return identifyChord(letterNotes, key)
+            return identifyChord(letterNotes, key, identifyInversions)
         }
         
         /**
@@ -121,8 +196,10 @@ class ChordIdentifier {
         /**
          * Attempts to identify incomplete chords (missing some notes)
          */
-        private fun identifyIncompleteChord(noteIndices: List<Int>): String? {
+        private fun identifyIncompleteChord(noteIndices: List<Int>, bassNote: String, identifyInversions: Boolean): String? {
             if (noteIndices.size < 2) return null
+            
+            val bassNoteIndex = NOTES.indexOf(bassNote)
             
             // For triads with missing fifths (just root and third)
             if (noteIndices.size == 2) {
@@ -130,14 +207,32 @@ class ChordIdentifier {
                     val intervals = calculateIntervals(noteIndices, potentialRoot)
                     
                     if (intervals.contains(4)) {
+                        val rootNoteName = NOTES[potentialRoot]
+                        
+                        if (identifyInversions && potentialRoot != bassNoteIndex) {
+                            return "$rootNoteName Major (no 5th)/$bassNote"
+                        }
+                        
                         return "${NOTES[potentialRoot]} Major (no 5th)"
                     }
                     
                     if (intervals.contains(3)) {
+                        val rootNoteName = NOTES[potentialRoot]
+                        
+                        if (identifyInversions && potentialRoot != bassNoteIndex) {
+                            return "$rootNoteName Minor (no 5th)/$bassNote"
+                        }
+                        
                         return "${NOTES[potentialRoot]} Minor (no 5th)"
                     }
                     
                     if (intervals.contains(7)) {
+                        val rootNoteName = NOTES[potentialRoot]
+                        
+                        if (identifyInversions && potentialRoot != bassNoteIndex) {
+                            return "$rootNoteName 5 (Power Chord)/$bassNote"
+                        }
+                        
                         return "${NOTES[potentialRoot]} 5 (Power Chord)"
                     }
                 }
@@ -150,10 +245,22 @@ class ChordIdentifier {
                     
                     // Check for triads
                     if (intervals.containsAll(setOf(0, 4, 7).minus(setOf(7)))) {
+                        val rootNoteName = NOTES[potentialRoot]
+                        
+                        if (identifyInversions && potentialRoot != bassNoteIndex) {
+                            return "$rootNoteName Major/$bassNote"
+                        }
+                        
                         return "${NOTES[potentialRoot]} Major"
                     }
                     
                     if (intervals.containsAll(setOf(0, 3, 7).minus(setOf(7)))) {
+                        val rootNoteName = NOTES[potentialRoot]
+                        
+                        if (identifyInversions && potentialRoot != bassNoteIndex) {
+                            return "$rootNoteName Minor/$bassNote"
+                        }
+                        
                         return "${NOTES[potentialRoot]} Minor"
                     }
                     

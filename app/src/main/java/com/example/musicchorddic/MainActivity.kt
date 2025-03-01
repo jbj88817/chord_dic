@@ -14,6 +14,7 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var binding: ActivityMainBinding
     private var useLetterNotation = true
+    private var showDetailedInversions = false
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,6 +23,7 @@ class MainActivity : AppCompatActivity() {
         
         setupKeyDropdown()
         setupNotationRadioGroup()
+        setupInversionSwitch()
         setupButtonListeners()
         setupKeyboardDismissal()
     }
@@ -43,6 +45,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 binding.notesInputLayout.helperText = "Example: 1 3 5 or 1,3,5"
             }
+        }
+    }
+    
+    private fun setupInversionSwitch() {
+        binding.inversionSwitch.setOnCheckedChangeListener { _, isChecked ->
+            showDetailedInversions = isChecked
         }
     }
     
@@ -98,11 +106,15 @@ class MainActivity : AppCompatActivity() {
         val chordName = if (useLetterNotation) {
             // Process letter notation
             val notes = ChordIdentifier.parseNotes(notesInput)
-            ChordIdentifier.identifyChord(notes, selectedKey)
+            if (showDetailedInversions) {
+                ChordIdentifier.identifyChordWithInversion(notes, selectedKey)
+            } else {
+                ChordIdentifier.identifyChord(notes, selectedKey)
+            }
         } else {
             // Process numeric notation
             val numericNotes = ChordIdentifier.parseNumericNotes(notesInput)
-            ChordIdentifier.identifyChordFromNumeric(numericNotes, selectedKey)
+            ChordIdentifier.identifyChordFromNumeric(numericNotes, selectedKey, !showDetailedInversions)
         }
         
         // Display the result

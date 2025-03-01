@@ -8,4 +8,5 @@
     <string name="notes_hint">Example: C E G or 1 3 5</string>
     <string name="use_numeric">Use numeric notation</string>
     <string name="use_letter">Use letter notation</string>
+    <string name="show_inversions">Show detailed inversions</string>
 </resources> 
